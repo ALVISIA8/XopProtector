@@ -1,6 +1,7 @@
 package com.yqsh.protector.shell;
 
 import android.app.Application;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.text.TextUtils;
 import android.util.Log;
@@ -11,6 +12,7 @@ import androidx.annotation.Nullable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -105,6 +107,104 @@ public final class ApplicationReplacer {
         } catch (Throwable t) {
             Log.e(TAG, "replace failed", t);
             return null;
+        }
+    }
+
+    /**
+     * Re-pin system Application pointers to an already-created real Application.
+     * <p>Early {@link #replace} runs inside Proxy {@code attachBaseContext}. After that
+     * returns, the outer {@code LoadedApk.makeApplication} assigns {@code mApplication}
+     * / {@code mInitialApplication} back to the Proxy. Call this from Proxy
+     * {@code onCreate} (after outer makeApplication finished) so
+     * {@code Activity.getApplication()} / {@code Context.getApplicationContext()}
+     * resolve to the real Application — without creating a second instance.
+     *
+     * @return true if pointers were updated
+     */
+    public static boolean reattach(Application real) {
+        if (real == null) {
+            return false;
+        }
+        try {
+            Object activityThread = currentActivityThread();
+            if (activityThread == null) {
+                Log.e(TAG, "reattach: ActivityThread is null");
+                return false;
+            }
+
+            Object boundApp = getField(activityThread, "mBoundApplication");
+            if (boundApp == null) {
+                Log.e(TAG, "reattach: mBoundApplication is null");
+                return false;
+            }
+
+            Object loadedApk = getField(boundApp, "info");
+            if (loadedApk == null) {
+                Log.e(TAG, "reattach: LoadedApk is null");
+                return false;
+            }
+
+            setField(loadedApk, "mApplication", real);
+            setField(activityThread, "mInitialApplication", real);
+
+            Object allApps = getField(activityThread, "mAllApplications");
+            if (allApps instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> list = (List<Object>) allApps;
+                Iterator<Object> it = list.iterator();
+                while (it.hasNext()) {
+                    Object o = it.next();
+                    if (!(o instanceof Application)) {
+                        continue;
+                    }
+                    Application app = (Application) o;
+                    if (app == real) {
+                        continue;
+                    }
+                    String name = app.getClass().getName();
+                    if (!name.startsWith("com.yqsh.protector.shell.")) {
+                        continue;
+                    }
+                    // Point leftover Proxy ContextImpl at real before dropping it.
+                    syncOuterContext(app, real);
+                    it.remove();
+                }
+                if (!list.contains(real)) {
+                    list.add(real);
+                }
+            }
+
+            syncOuterContext(real, real);
+
+            // ApplicationInfo.className may still say Proxy after packer rewrite;
+            // keep it aligned with the live instance for any late framework reads.
+            String realName = real.getClass().getName();
+            ApplicationInfo loadedAi = (ApplicationInfo) getField(loadedApk, "mApplicationInfo");
+            ApplicationInfo bindAi = (ApplicationInfo) getField(boundApp, "appInfo");
+            if (loadedAi != null) {
+                loadedAi.className = realName;
+            }
+            if (bindAi != null) {
+                bindAi.className = realName;
+            }
+
+            Log.i(TAG, "reattached " + realName);
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "reattach failed", t);
+            return false;
+        }
+    }
+
+    /** Ensure ContextImpl.mOuterContext points at {@code real} (OEM / getApplicationContext). */
+    private static void syncOuterContext(Application holder, Application real) {
+        try {
+            Context base = holder.getBaseContext();
+            if (base != null) {
+                setField(base, "mOuterContext", real);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "syncOuterContext failed for " + holder.getClass().getName(), t);
         }
     }
 

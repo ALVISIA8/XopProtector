@@ -228,6 +228,11 @@ public class ProxyApplication extends Application {
                 if (realApplication == null) {
                     replaced = false;
                 }
+            } else if (invokeOnCreate && realApplication != null) {
+                // Outer LoadedApk.makeApplication overwrote mApplication /
+                // mInitialApplication back to this Proxy after early replace.
+                // Re-pin so Activity.getApplication() is the real Application.
+                ApplicationReplacer.reattach(realApplication);
             }
             if (invokeOnCreate && realApplication != null && !realOnCreateCalled) {
                 // Providers already ran under the replaced Application. Clear the
@@ -264,6 +269,8 @@ public class ProxyApplication extends Application {
             return;
         }
         try {
+            ApplicationReplacer.reattach(business);
+            realApplication = business;
             business.onCreate();
             Log.i(TAG, "business Application.onCreate called: " + business.getClass().getName());
         } catch (Throwable t) {

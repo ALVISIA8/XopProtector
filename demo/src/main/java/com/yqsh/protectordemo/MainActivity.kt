@@ -13,6 +13,13 @@ class MainActivity : AppCompatActivity() {
         tv.setPadding(48, 48, 48, 48)
         val packed = isProtectorPacked()
         try {
+            // Shell must re-pin Application so getApplication() is DemoApplication, not Proxy.
+            val app = application
+            if (app !is DemoApplication) {
+                throw ClassCastException(
+                    "getApplication() is ${app.javaClass.name}, expected DemoApplication"
+                )
+            }
             Business.stamp = 1 // triggers loadLibrary("demo_biz")
             if (packed) {
                 // Linker may bypass hooked dlopen; force .text decrypt after load.
