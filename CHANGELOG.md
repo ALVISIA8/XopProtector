@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.29
+
+- Desktop / installer / packer jar version **0.6.29**.
+
 ## 0.6.28
 
 - Desktop / installer / packer jar version **0.6.28**.
