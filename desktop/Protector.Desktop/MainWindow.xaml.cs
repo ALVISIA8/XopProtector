@@ -81,7 +81,7 @@ public partial class MainWindow : Window
             return plus > 0 ? info[..plus] : info;
         }
         var v = asm.GetName().Version;
-        return v == null ? "0.6.27" : $"{v.Major}.{v.Minor}.{v.Build}";
+        return v == null ? "0.6.28" : $"{v.Major}.{v.Minor}.{v.Build}";
     }
 
     private void Nav_Click(object sender, RoutedEventArgs e)
