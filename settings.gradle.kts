@@ -22,7 +22,7 @@ include(":packer")
 val unimpLibsProp = providers.gradleProperty("unimp.sdk.libs").orNull?.trim().orEmpty()
 val unimpLibsCandidates = listOfNotNull(
     unimpLibsProp.takeIf { it.isNotEmpty() }?.let { file(it) },
-    file("E:/Android/SDK-Android@5.14-20260706/SDK/libs"),
+    // file("E:/Android/SDK-Android@5.14-20260706/SDK/libs"), // dihapus: path Windows menyebabkan error di Linux CI
     file("../SDK-Android@5.14-20260706/SDK/libs"),
 )
 if (unimpLibsCandidates.any { it.isDirectory }) {
