@@ -1,0 +1,47 @@
+name: Build XopProtector (Packer + Shell Files)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;26.1.10909125"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build packer jar
+        run: ./gradlew :packer:jar --no-daemon
+
+      - name: Export native shell files
+        run: ./gradlew exportShellFiles --no-daemon
+
+      - name: Package build results
+        run: |
+          mkdir -p xopprotector-build-output/shell-files
+          find . -path "*/packer/build/libs/protector-packer*.jar" -exec cp {} xopprotector-build-output/ \;
+          cp -r executable/shell-files/* xopprotector-build-output/shell-files/ 2>/dev/null || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xopprotector-build-output
+          path: xopprotector-build-output/
+          retention-days: 14
